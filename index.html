@@ -27,7 +27,6 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
 .hidden { display:none; }
 .loading { display:inline-block; width:20px; height:20px; border:3px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:8px; }
 @keyframes spin { to { transform:rotate(360deg); } }
-
 /* 同意文オーバーレイ */
 .overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center; }
 .overlay.show { display:flex; }
@@ -38,7 +37,6 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
 </style>
 </head>
 <body>
-
 <!-- 登録画面 -->
 <div class="container" id="register-view">
   <div class="shop-name">リリー</div>
@@ -57,7 +55,6 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
   </div>
   <div class="status" id="status">読み込み中...</div>
 </div>
-
 <!-- 完了画面 -->
 <div class="container hidden" id="done-view">
   <div class="done-icon">✅</div>
@@ -71,14 +68,12 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
   </button>
   <div style="margin-top:8px;font-size:12px;color:#aaa;">自動で移動しない場合はボタンを押してください</div>
 </div>
-
 <!-- エラー画面 -->
 <div class="container hidden" id="error-view">
   <div class="done-icon">⚠️</div>
   <div class="done-msg" id="error-title">エラー</div>
   <div class="done-sub" id="error-msg">しばらくしてからもう一度お試しください。</div>
 </div>
-
 <!-- 同意文オーバーレイ -->
 <div class="overlay" id="policy-overlay" onclick="closePolicy(event)">
   <div class="policy-box" onclick="event.stopPropagation()">
@@ -97,7 +92,6 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
     <button class="close-btn" onclick="closePolicy()">閉じる</button>
   </div>
 </div>
-
 <script>
 // ====================================
 // 設定値（★ここだけ環境に合わせて変更★）
@@ -105,24 +99,20 @@ body { font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif; background
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbynkswoPrAvXCdswmuiZd6dfnEel6EqIHoyVW_gzfSoJ6NMXWsFdi6A2ofK4u3k4aH8Tg/exec';
 var LIFF_ID = '2009957944-YI32Qf02';
 var FRIEND_ADD_URL = 'https://line.me/R/ti/p/@482rmfbr';
-
 // ====================================
 // 初期化
 // ====================================
 var lineProfile = null;
 var liffReady = false;
-
 // QR番号をURLから取得（LIFF経由のパラメータ対応）
 function getQrNum() {
   var url = window.location.href;
   var search = window.location.search || '';
   var hash = window.location.hash || '';
   var found = '';
-
   // 1. searchから取得
   var p = new URLSearchParams(search);
   if (p.get('qr')) { found = p.get('qr'); }
-
   // 2. liff.stateから取得（LIFFがパラメータをliff.stateに格納する場合）
   if (!found) {
     var ls = p.get('liff.state') || '';
@@ -131,28 +121,23 @@ function getQrNum() {
       if (m) found = m[1];
     }
   }
-
   // 3. hashから取得（LIFFはliff.stateとしてhashに入れることもある）
   if (!found && hash) {
     var decoded = decodeURIComponent(hash);
     var m2 = decoded.match(/qr=([^&]*)/);
     if (m2) found = m2[1];
   }
-
   // 4. href全体から最終手段で探す
   if (!found) {
     var m3 = url.match(/[?&#]qr=([^&#]*)/);
     if (m3) found = m3[1];
   }
-
   return found || '0';
 }
 var QR_NUM = getQrNum();
 document.getElementById('qr-label').textContent = 'QR No.' + QR_NUM;
-
 // LIFF初期化
 document.getElementById('status').textContent = 'LIFF初期化中...';
-
 liff.init({ liffId: LIFF_ID }).then(function() {
   document.getElementById('status').textContent = 'ログイン確認中...';
   if (!liff.isLoggedIn()) {
@@ -179,7 +164,6 @@ liff.init({ liffId: LIFF_ID }).then(function() {
 }).catch(function(err) {
   document.getElementById('status').textContent = 'エラー: ' + (err.message || err);
 });
-
 // ====================================
 // 機能
 // ====================================
@@ -187,20 +171,17 @@ function toggleBtn() {
   var cb = document.getElementById('consent-cb').checked;
   document.getElementById('register-btn').disabled = !(cb && liffReady);
 }
-
 function doRegister() {
   var btn = document.getElementById('register-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span>登録中...';
   document.getElementById('status').textContent = '';
-
   var data = {
     action: 'qrRegister',
     lineId: lineProfile.userId,
     displayName: lineProfile.displayName || '',
     qrNum: QR_NUM
   };
-
   fetch(GAS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
@@ -209,7 +190,15 @@ function doRegister() {
   .then(function(res) { return res.json(); })
   .then(function(result) {
     if (result.success) {
-      addFriend();
+      // ★ 自動リダイレクトを試みる（Android Chromeでブロックされる場合あり）
+      if (liff.isInClient()) {
+        window.location.href = FRIEND_ADD_URL;
+      } else {
+        var w = window.open(FRIEND_ADD_URL);
+        if (!w) { showDoneView(); }
+      }
+      // フォールバック: 2秒後にまだページにいたら完了画面表示
+      setTimeout(function() { showDoneView(); }, 2000);
     } else {
       showError('登録エラー', result.message || '登録に失敗しました');
     }
@@ -218,7 +207,10 @@ function doRegister() {
     showError('通信エラー', 'サーバーに接続できませんでした');
   });
 }
-
+function showDoneView() {
+  document.getElementById('register-view').classList.add('hidden');
+  document.getElementById('done-view').classList.remove('hidden');
+}
 function addFriend() {
   if (liff.isInClient()) {
     window.location.href = FRIEND_ADD_URL;
@@ -226,17 +218,14 @@ function addFriend() {
     window.open(FRIEND_ADD_URL);
   }
 }
-
 function showPolicy() {
   document.getElementById('policy-overlay').classList.add('show');
 }
-
 function closePolicy(e) {
   if (!e || e.target === document.getElementById('policy-overlay')) {
     document.getElementById('policy-overlay').classList.remove('show');
   }
 }
-
 function showError(title, msg) {
   document.getElementById('register-view').classList.add('hidden');
   document.getElementById('error-view').classList.remove('hidden');
